@@ -1,0 +1,4 @@
+{
+  "build": "echo 'No build needed'",
+  "install": "echo 'No install needed'"
+}
