@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Minecraft AR - Тапай блоки!</title>
+    <title>Minecraft AR</title>
     <style>
         * {
             margin: 0;
@@ -21,14 +21,152 @@
             touch-action: none;
         }
         
-        /* Camera Video Background */
-        #camera-bg {
+        /* Minecraft Pixel Background */
+        #minecraft-bg {
             position: fixed;
             inset: 0;
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
             z-index: 0;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        
+        /* Sky gradient */
+        .sky {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, 
+                #5B97DB 0%, 
+                #6BA3E0 20%, 
+                #87B5E0 40%, 
+                #A8D0E8 60%,
+                #7CBA5F 70%,
+                #5D8C3E 85%,
+                #4A7030 100%
+            );
+        }
+        
+        /* Clouds */
+        .cloud {
+            position: absolute;
+            background: rgba(255,255,255,0.9);
+            border-radius: 10px;
+            image-rendering: pixelated;
+        }
+        
+        /* Sun */
+        .sun {
+            position: absolute;
+            top: 8%;
+            right: 15%;
+            width: 60px;
+            height: 60px;
+            background: #FFE135;
+            border-radius: 50%;
+            box-shadow: 0 0 30px #FFE135;
+        }
+        
+        /* Mountains */
+        .mountain {
+            position: absolute;
+            bottom: 30%;
+            width: 0;
+            height: 0;
+            border-left: 80px solid transparent;
+            border-right: 80px solid transparent;
+            border-bottom: 120px solid #6B7B6B;
+        }
+        
+        .mountain::after {
+            content: '';
+            position: absolute;
+            top: 30px;
+            left: -30px;
+            width: 0;
+            height: 0;
+            border-left: 30px solid transparent;
+            border-right: 30px solid transparent;
+            border-bottom: 40px solid #fff;
+        }
+        
+        /* Hills */
+        .hill {
+            position: absolute;
+            bottom: 15%;
+            width: 150px;
+            height: 60px;
+            background: #5D8C3E;
+            border-radius: 50% 50% 0 0;
+        }
+        
+        /* Grass/Dirt layers */
+        .ground {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 15%;
+            background: linear-gradient(180deg,
+                #5D8C3E 0%,
+                #5D8C3E 20%,
+                #8B5A2B 20%,
+                #8B5A2B 100%
+            );
+        }
+        
+        /* Grass blocks pattern */
+        .ground::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 20%;
+            background: repeating-linear-gradient(
+                90deg,
+                #5D8C3E 0px,
+                #5D8C3E 15px,
+                #4A7030 15px,
+                #4A7030 30px
+            );
+        }
+        
+        /* Trees */
+        .tree {
+            position: absolute;
+            bottom: 15%;
+        }
+        
+        .tree-trunk {
+            width: 20px;
+            height: 60px;
+            background: repeating-linear-gradient(
+                90deg,
+                #6B4423 0px,
+                #6B4423 10px,
+                #5D3A1A 10px,
+                #5D3A1A 20px
+            );
+            margin: 0 auto;
+        }
+        
+        .tree-leaves {
+            width: 60px;
+            height: 50px;
+            background: #2D5A27;
+            margin-left: -20px;
+            border-radius: 5px;
+            position: relative;
+        }
+        
+        .tree-leaves::before {
+            content: '';
+            position: absolute;
+            top: -15px;
+            left: 10px;
+            width: 40px;
+            height: 30px;
+            background: #2D5A27;
+            border-radius: 5px;
         }
         
         /* Game Container */
@@ -52,22 +190,25 @@
         
         #score-box {
             background: rgba(0, 0, 0, 0.85);
-            border: 3px solid #50C878;
-            border-radius: 12px;
-            padding: 10px 25px;
-            color: #50C878;
+            border: 4px solid #7D7D7D;
+            border-radius: 8px;
+            padding: 8px 20px;
+            color: #FFD700;
             font-size: 24px;
             font-weight: bold;
             display: none;
             text-align: center;
+            font-family: 'Press Start 2D', monospace;
+            image-rendering: pixelated;
         }
         
         #combo {
-            font-size: 14px;
-            color: #FFD700;
+            font-size: 12px;
+            color: #FF0000;
             display: block;
             opacity: 0;
             transition: opacity 0.2s;
+            font-family: 'Press Start 2D', monospace;
         }
         
         #combo.show {
@@ -77,88 +218,147 @@
         /* Blocks */
         .block {
             position: absolute;
-            width: 70px;
-            height: 70px;
+            width: 65px;
+            height: 65px;
             cursor: pointer;
-            transition: transform 0.1s;
+            transition: transform 0.05s;
             image-rendering: pixelated;
+            image-rendering: crisp-edges;
         }
         
         .block:active {
-            transform: scale(0.9);
+            transform: scale(0.85);
         }
         
-        /* Minecraft-style block textures (CSS patterns) */
+        /* Minecraft Block Textures */
         .block-dirt {
-            background: linear-gradient(135deg, #8B5A2B 0%, #6B4423 100%);
+            background: 
+                repeating-linear-gradient(0deg, #8B5A2B 0px, #8B5A2B 8px, #7A4E23 8px, #7A4E23 16px),
+                repeating-linear-gradient(90deg, #8B5A2B 0px, #8B5A2B 8px, #7A4E23 8px, #7A4E23 16px);
             border: 4px solid #5D3A1A;
-            box-shadow: inset 3px 3px 0 rgba(255,255,255,0.2), inset -3px -3px 0 rgba(0,0,0,0.3);
         }
         
         .block-grass {
-            background: linear-gradient(180deg, #5D8C3E 0%, #5D8C3E 30%, #8B5A2B 30%, #8B5A2B 100%);
+            background: linear-gradient(180deg, 
+                #5D8C3E 0%, 
+                #5D8C3E 25%, 
+                #8B5A2B 25%, 
+                #8B5A2B 100%
+            );
             border: 4px solid #3D5C2E;
-            box-shadow: inset 3px 3px 0 rgba(255,255,255,0.2);
+        }
+        
+        .block-grass-top {
+            background: 
+                repeating-linear-gradient(90deg, #5D8C3E 0px, #5D8C3E 6px, #4A7030 6px, #4A7030 12px),
+                repeating-linear-gradient(0deg, #5D8C3E 0px, #5D8C3E 6px, #4A7030 6px, #4A7030 12px);
         }
         
         .block-stone {
-            background: linear-gradient(135deg, #9E9E9E 0%, #757575 50%, #9E9E9E 100%);
-            border: 4px solid #555;
-            box-shadow: inset 3px 3px 0 rgba(255,255,255,0.2), inset -3px -3px 0 rgba(0,0,0,0.2);
+            background: 
+                repeating-linear-gradient(45deg, #9E9E9E 0px, #9E9E9E 8px, #8E8E8E 8px, #8E8E8E 16px),
+                repeating-linear-gradient(-45deg, #9E9E9E 0px, #9E9E9E 8px, #8E8E8E 8px, #8E8E8E 16px);
+            border: 4px solid #5E5E5E;
         }
         
         .block-wood {
             background: repeating-linear-gradient(
-                0deg,
+                90deg,
                 #8B4513 0px,
-                #8B4513 10px,
-                #6B3510 10px,
-                #6B3510 20px
+                #8B4513 12px,
+                #6B3510 12px,
+                #6B3510 24px
             );
             border: 4px solid #4A2508;
         }
         
+        .block-wood-side {
+            background: 
+                repeating-linear-gradient(0deg, #8B4513 0px, #8B4513 10px, #6B3510 10px, #6B3510 20px),
+                linear-gradient(90deg, transparent 40%, #4A2508 40%, #4A2508 60%, transparent 60%);
+            border: 4px solid #4A2508;
+        }
+        
         .block-gold {
-            background: linear-gradient(135deg, #FFD700 0%, #FFA500 50%, #FFD700 100%);
+            background: 
+                repeating-linear-gradient(45deg, #FFD700 0px, #FFD700 5px, #FFC800 5px, #FFC800 10px),
+                repeating-linear-gradient(-45deg, #FFD700 0px, #FFD700 5px, #FFC800 5px, #FFC800 10px);
             border: 4px solid #CC8400;
-            box-shadow: inset 3px 3px 10px rgba(255,255,255,0.5);
-            animation: shine 1s infinite;
+            box-shadow: inset 0 0 15px rgba(255,255,255,0.5);
         }
         
         .block-diamond {
-            background: linear-gradient(135deg, #4AEDD9 0%, #00CED1 50%, #4AEDD9 100%);
+            background: linear-gradient(135deg, #4AEDD9 0%, #3AD9C9 25%, #4AEDD9 50%, #2ECDC1 75%, #4AEDD9 100%);
             border: 4px solid #2A9D8F;
-            box-shadow: inset 3px 3px 10px rgba(255,255,255,0.6);
-            animation: shine 0.8s infinite;
+            box-shadow: inset 0 0 20px rgba(255,255,255,0.6);
+            position: relative;
+        }
+        
+        .block-diamond::after {
+            content: '◆';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 30px;
+            color: rgba(255,255,255,0.7);
         }
         
         .block-redstone {
-            background: #8B0000;
-            border: 4px solid #5C0000;
+            background: #6B0000;
+            border: 4px solid #4A0000;
             position: relative;
+        }
+        
+        .block-redstone::before {
+            content: '';
+            position: absolute;
+            top: 30%;
+            left: 10%;
+            right: 10%;
+            height: 4px;
+            background: #FF0000;
+            box-shadow: 0 -12px 0 #FF0000, 0 12px 0 #FF0000;
         }
         
         .block-redstone::after {
             content: '';
             position: absolute;
-            top: 50%;
-            left: 10%;
-            right: 10%;
+            bottom: 20%;
+            left: 20%;
+            width: 60%;
             height: 4px;
             background: #FF0000;
-            box-shadow: 0 -15px 0 #FF0000, 0 15px 0 #FF0000;
         }
         
         .block-emerald {
-            background: linear-gradient(135deg, #50C878 0%, #2E8B57 100%);
+            background: linear-gradient(135deg, #50C878 0%, #3AB56F 50%, #50C878 100%);
             border: 4px solid #1D5D3A;
-            box-shadow: inset 3px 3px 10px rgba(255,255,255,0.4);
-            animation: shine 1.2s infinite;
+            box-shadow: inset 0 0 15px rgba(255,255,255,0.4);
+            position: relative;
         }
         
-        @keyframes shine {
-            0%, 100% { filter: brightness(1); }
-            50% { filter: brightness(1.3); }
+        .block-emerald::after {
+            content: '●';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 28px;
+            color: rgba(255,255,255,0.6);
+        }
+        
+        .block-obsidian {
+            background: #1a0a2e;
+            border: 4px solid #0d0518;
+            position: relative;
+        }
+        
+        .block-obsidian::before {
+            content: '';
+            position: absolute;
+            inset: 5px;
+            border: 2px solid rgba(100,50,150,0.5);
         }
         
         /* Start Screen */
@@ -178,44 +378,53 @@
             display: none;
         }
         
-        #start-screen h1 {
+        /* Minecraft-style title */
+        .mc-title {
+            font-family: 'Press Start 2D', 'Courier New', monospace;
+            font-size: 32px;
             color: #50C878;
-            font-size: 42px;
-            text-shadow: 4px 4px 0 #000;
+            text-shadow: 
+                4px 4px 0 #3DA066,
+                -1px -1px 0 #5D8C3E;
             margin-bottom: 5px;
+            image-rendering: pixelated;
         }
         
-        #start-screen .subtitle {
+        .mc-subtitle {
+            font-family: 'Press Start 2D', monospace;
+            font-size: 14px;
             color: #FFD700;
-            font-size: 18px;
             margin-bottom: 30px;
+            text-shadow: 2px 2px 0 #000;
         }
         
         #start-btn {
-            background: linear-gradient(180deg, #50C878 0%, #3DA066 100%);
-            border: 4px solid #2D7A4E;
-            border-radius: 15px;
-            padding: 20px 50px;
-            font-size: 26px;
-            font-weight: bold;
+            background: linear-gradient(180deg, #7D7D7D 0%, #5D5D5D 50%, #4D4D4D 100%);
+            border: 4px solid #3D3D3D;
+            border-bottom-color: #2D2D2D;
+            border-radius: 4px;
+            padding: 18px 45px;
+            font-family: 'Press Start 2D', monospace;
+            font-size: 18px;
             color: #fff;
             cursor: pointer;
             text-shadow: 2px 2px 0 #000;
-            box-shadow: 0 6px 0 #1D4D32, 0 8px 15px rgba(0,0,0,0.4);
+            box-shadow: 0 6px 0 #2D2D2D;
             transition: all 0.1s;
         }
         
         #start-btn:active {
             transform: translateY(4px);
-            box-shadow: 0 2px 0 #1D4D32, 0 4px 10px rgba(0,0,0,0.4);
+            box-shadow: 0 2px 0 #2D2D2D;
         }
         
         #start-screen .info {
             color: #888;
             margin-top: 25px;
             text-align: center;
-            line-height: 1.8;
-            font-size: 14px;
+            line-height: 2;
+            font-size: 13px;
+            font-family: 'Press Start 2D', monospace;
         }
         
         #start-screen .info span {
@@ -226,7 +435,7 @@
         #win-modal {
             position: fixed;
             inset: 0;
-            background: rgba(0, 0, 0, 0.9);
+            background: rgba(0, 0, 0, 0.85);
             display: none;
             align-items: center;
             justify-content: center;
@@ -238,89 +447,57 @@
         }
         
         #win-content {
-            background: linear-gradient(180deg, #1a1a2e 0%, #2d2d5a 100%);
-            border: 5px solid #FFD700;
-            border-radius: 20px;
+            background: linear-gradient(180deg, #3D3D3D 0%, #2D2D2D 100%);
+            border: 5px solid #7D7D7D;
+            border-radius: 8px;
             padding: 30px 40px;
             text-align: center;
         }
         
         #win-content h2 {
+            font-family: 'Press Start 2D', monospace;
             color: #FFD700;
-            font-size: 36px;
-            margin-bottom: 15px;
+            font-size: 24px;
+            margin-bottom: 20px;
+            text-shadow: 3px 3px 0 #000;
         }
         
         #win-content .score {
+            font-family: 'Press Start 2D', monospace;
             color: #50C878;
-            font-size: 48px;
-            font-weight: bold;
+            font-size: 36px;
+            text-shadow: 2px 2px 0 #000;
         }
         
         #win-content .promo-label {
             color: #888;
-            font-size: 12px;
+            font-size: 10px;
             margin-top: 15px;
+            font-family: 'Press Start 2D', monospace;
         }
         
         #win-content .promo {
             color: #50C878;
-            font-size: 22px;
-            background: rgba(80, 200, 120, 0.15);
+            font-size: 18px;
+            font-family: 'Press Start 2D', monospace;
+            background: #1a1a2e;
             padding: 12px 20px;
-            border-radius: 8px;
+            border-radius: 4px;
             margin: 10px 0;
-            border: 2px dashed #50C878;
-            font-family: monospace;
+            border: 3px dashed #50C878;
         }
         
         #play-again {
-            background: linear-gradient(180deg, #FFD700 0%, #FFA500 100%);
-            border: 4px solid #CC8400;
-            border-radius: 12px;
-            padding: 15px 35px;
-            font-size: 18px;
-            font-weight: bold;
-            color: #1a1a2e;
+            background: linear-gradient(180deg, #50C878 0%, #3DA066 100%);
+            border: 4px solid #2D7A4E;
+            border-radius: 4px;
+            padding: 15px 30px;
+            font-family: 'Press Start 2D', monospace;
+            font-size: 14px;
+            color: #fff;
             cursor: pointer;
             margin-top: 15px;
-        }
-        
-        /* Loading */
-        #loading {
-            position: fixed;
-            inset: 0;
-            background: #0a0a15;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            z-index: 500;
-            color: #fff;
-        }
-        
-        #loading.hidden {
-            display: none;
-        }
-        
-        .loader {
-            width: 60px;
-            height: 60px;
-            border: 6px solid #333;
-            border-top: 6px solid #50C878;
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
-        }
-        
-        #loading p {
-            margin-top: 20px;
-            font-size: 16px;
-            color: #888;
+            text-shadow: 2px 2px 0 #000;
         }
         
         /* Particles */
@@ -328,6 +505,7 @@
             position: fixed;
             pointer-events: none;
             z-index: 50;
+            image-rendering: pixelated;
         }
         
         /* Status */
@@ -338,39 +516,90 @@
             transform: translateX(-50%);
             background: rgba(0,0,0,0.8);
             color: #FFD700;
-            padding: 10px 20px;
-            border-radius: 10px;
-            font-size: 14px;
+            padding: 12px 20px;
+            border-radius: 4px;
+            font-family: 'Press Start 2D', monospace;
+            font-size: 12px;
             z-index: 100;
+            border: 3px solid #7D7D7D;
         }
         
+        /* Back button */
         #back-btn {
             position: fixed;
             top: 15px;
             left: 15px;
-            background: rgba(0,0,0,0.8);
-            border: 2px solid #fff;
+            background: #7D7D7D;
+            border: 3px solid #3D3D3D;
             color: #fff;
-            padding: 10px 18px;
-            border-radius: 8px;
+            padding: 10px 15px;
+            border-radius: 4px;
             z-index: 150;
             text-decoration: none;
-            font-size: 14px;
+            font-family: 'Press Start 2D', monospace;
+            font-size: 10px;
+            display: none;
+        }
+        
+        /* Block spawn indicator */
+        @keyframes blockAppear {
+            0% { transform: scale(0) rotate(-180deg); }
+            50% { transform: scale(1.2) rotate(10deg); }
+            100% { transform: scale(1) rotate(0deg); }
+        }
+        
+        .block.new {
+            animation: blockAppear 0.3s ease-out;
         }
     </style>
 </head>
 <body>
-    <!-- Loading -->
-    <div id="loading">
-        <div class="loader"></div>
-        <p>Загрузка камеры...</p>
+    <!-- Minecraft Background -->
+    <div id="minecraft-bg">
+        <div class="sky"></div>
+        <div class="sun"></div>
+        
+        <!-- Clouds -->
+        <div class="cloud" style="top: 10%; left: 10%; width: 80px; height: 30px;"></div>
+        <div class="cloud" style="top: 15%; left: 50%; width: 100px; height: 35px;"></div>
+        <div class="cloud" style="top: 8%; left: 75%; width: 70px; height: 25px;"></div>
+        
+        <!-- Mountains -->
+        <div class="mountain" style="left: 5%;"></div>
+        <div class="mountain" style="left: 15%; border-bottom-width: 80px; border-left-width: 60px; border-right-width: 60px;"></div>
+        <div class="mountain" style="left: 70%; border-bottom-width: 100px;"></div>
+        <div class="mountain" style="left: 82%; border-bottom-width: 60px; border-left-width: 50px; border-right-width: 50px;"></div>
+        
+        <!-- Hills -->
+        <div class="hill" style="left: 0%;"></div>
+        <div class="hill" style="left: 25%; transform: scale(1.2);"></div>
+        <div class="hill" style="left: 60%;"></div>
+        <div class="hill" style="left: 80%; transform: scale(0.8);"></div>
+        
+        <!-- Trees -->
+        <div class="tree" style="left: 8%;">
+            <div class="tree-leaves"></div>
+            <div class="tree-trunk"></div>
+        </div>
+        <div class="tree" style="left: 35%;">
+            <div class="tree-leaves"></div>
+            <div class="tree-trunk"></div>
+        </div>
+        <div class="tree" style="left: 55%;">
+            <div class="tree-leaves"></div>
+            <div class="tree-trunk"></div>
+        </div>
+        <div class="tree" style="left: 88%;">
+            <div class="tree-leaves"></div>
+            <div class="tree-trunk"></div>
+        </div>
+        
+        <!-- Ground -->
+        <div class="ground"></div>
     </div>
     
-    <!-- Camera -->
-    <video id="camera-bg" autoplay playsinline muted></video>
-    
     <!-- Back -->
-    <a href="/ar" id="back-btn" style="display:none;">← Назад</a>
+    <a href="/ar" id="back-btn">← НАЗАД</a>
     
     <!-- Game -->
     <div id="game">
@@ -380,18 +609,17 @@
                 <span id="combo">COMBO x2!</span>
             </div>
         </div>
-        <div id="status" style="display:none;">👆 Тапай по блокам!</div>
+        <div id="status" style="display:none;">👆 TAP BLOCKS!</div>
     </div>
     
     <!-- Start Screen -->
-    <div id="start-screen" class="hidden">
-        <h1>⛏️ MINECRAFT</h1>
-        <p class="subtitle">AR</p>
+    <div id="start-screen">
+        <h1 class="mc-title">MINECRAFT</h1>
+        <p class="mc-subtitle">BLOCK TAP</p>
         <button id="start-btn">🎮 ИГРАТЬ</button>
         <div class="info">
-            <p>📷 Разреши камеру</p>
-            <p>👆 <span>Тапай</span> по блокам</p>
-            <p>🏆 Набери <span>10 очков</span> для победы!</p>
+            <p>👆 <span>TAP</span> ПО БЛОКАМ</p>
+            <p>🏆 НАБЕРИ <span>10 ОЧКОВ</span></p>
         </div>
     </div>
     
@@ -399,12 +627,12 @@
     <div id="win-modal">
         <div id="win-content">
             <h2>🎉 ПОБЕДА!</h2>
-            <p>Счёт:</p>
+            <p>СЧЁТ:</p>
             <div class="score"><span id="final-score">0</span></div>
-            <p class="promo-label">Твой промокод:</p>
+            <p class="promo-label">ПРОМОКОД:</p>
             <div class="promo">MINECRAFT-AR</div>
-            <p style="font-size:11px;color:#666;">Скидка 20%</p>
-            <button id="play-again">🔄 Ещё раз</button>
+            <p style="font-size:10px;color:#666;margin-top:5px;">СКИДКА 20%</p>
+            <button id="play-again">🔄 ЕЩЁ РАЗ</button>
         </div>
     </div>
     
@@ -416,19 +644,19 @@
             won: false,
             blocks: [],
             combo: 0,
-            lastTap: 0,
-            cameraReady: false
+            lastTap: 0
         };
         
         const BLOCK_TYPES = [
             { name: 'dirt', class: 'block-dirt', points: 1, speed: 2 },
             { name: 'grass', class: 'block-grass', points: 1, speed: 2 },
             { name: 'stone', class: 'block-stone', points: 1, speed: 2.5 },
-            { name: 'wood', class: 'block-wood', points: 1, speed: 2 },
-            { name: 'gold', class: 'block-gold', points: 3, speed: 3 },
+            { name: 'wood', class: 'block-wood-side', points: 1, speed: 2 },
+            { name: 'gold', class: 'block-gold', points: 3, speed: 3.5 },
             { name: 'diamond', class: 'block-diamond', points: 5, speed: 4 },
             { name: 'redstone', class: 'block-redstone', points: 2, speed: 3 },
-            { name: 'emerald', class: 'block-emerald', points: 4, speed: 3.5 }
+            { name: 'emerald', class: 'block-emerald', points: 4, speed: 3.5 },
+            { name: 'obsidian', class: 'block-obsidian', points: 6, speed: 5 }
         ];
         
         const $ = id => document.getElementById(id);
@@ -457,7 +685,7 @@
                     osc.type = 'square';
                     osc.frequency.setValueAtTime(400, audioCtx.currentTime);
                     osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.08);
-                    gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                    gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
                     gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.08);
                     osc.start();
                     osc.stop(audioCtx.currentTime + 0.1);
@@ -469,7 +697,7 @@
                         g.connect(audioCtx.destination);
                         o.type = 'square';
                         o.frequency.value = f;
-                        g.gain.setValueAtTime(0.15, audioCtx.currentTime + i * 0.12);
+                        g.gain.setValueAtTime(0.12, audioCtx.currentTime + i * 0.12);
                         g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + i * 0.12 + 0.2);
                         o.start(audioCtx.currentTime + i * 0.12);
                         o.stop(audioCtx.currentTime + i * 0.12 + 0.25);
@@ -479,50 +707,51 @@
         }
         
         // ============ PARTICLES ============
-        function createParticles(x, y, color) {
+        function createParticles(x, y, blockClass) {
             const colors = {
                 'block-dirt': '#8B5A2B',
                 'block-grass': '#5D8C3E',
                 'block-stone': '#9E9E9E',
-                'block-wood': '#8B4513',
+                'block-wood-side': '#8B4513',
                 'block-gold': '#FFD700',
                 'block-diamond': '#4AEDD9',
                 'block-redstone': '#FF0000',
-                'block-emerald': '#50C878'
+                'block-emerald': '#50C878',
+                'block-obsidian': '#1a0a2e'
             };
             
-            const particleColor = colors[color] || '#fff';
+            const color = colors[blockClass] || '#fff';
             
-            for (let i = 0; i < 12; i++) {
+            for (let i = 0; i < 10; i++) {
                 const p = document.createElement('div');
                 p.className = 'particle';
                 p.style.cssText = `
                     left: ${x}px;
                     top: ${y}px;
-                    width: 12px;
-                    height: 12px;
-                    background: ${particleColor};
-                    border-radius: 2px;
+                    width: 10px;
+                    height: 10px;
+                    background: ${color};
+                    border: 2px solid rgba(0,0,0,0.3);
                 `;
                 document.body.appendChild(p);
                 
-                const angle = (Math.PI * 2 / 12) * i;
-                let vx = Math.cos(angle) * 150;
-                let vy = Math.sin(angle) * 150 - 80;
+                const angle = (Math.PI * 2 / 10) * i;
+                let vx = Math.cos(angle) * 120;
+                let vy = Math.sin(angle) * 120 - 60;
                 let px = x, py = y, op = 1;
                 
                 const animate = () => {
-                    vy += 10;
+                    vy += 8;
                     px += vx * 0.02;
                     py += vy * 0.02;
-                    op -= 0.03;
+                    op -= 0.035;
                     p.style.cssText = `
                         left: ${px}px;
                         top: ${py}px;
-                        width: 12px;
-                        height: 12px;
-                        background: ${particleColor};
-                        border-radius: 2px;
+                        width: 10px;
+                        height: 10px;
+                        background: ${color};
+                        border: 2px solid rgba(0,0,0,0.3);
                         opacity: ${op};
                         pointer-events: none;
                     `;
@@ -544,13 +773,13 @@
             const type = BLOCK_TYPES[Math.floor(Math.random() * BLOCK_TYPES.length)];
             const block = document.createElement('div');
             
-            block.className = `block ${type.class}`;
+            block.className = `block ${type.class} new`;
             block.id = 'block-' + blockId++;
             
             // Random X position
-            const maxX = window.innerWidth - 80;
+            const maxX = window.innerWidth - 75;
             const x = Math.random() * maxX;
-            const y = -80;
+            const y = -70;
             
             block.style.left = x + 'px';
             block.style.top = y + 'px';
@@ -566,6 +795,9 @@
             block.addEventListener('touchstart', handleTap, { passive: false });
             
             $('game').appendChild(block);
+            
+            // Remove animation class after animation
+            setTimeout(() => block.classList.remove('new'), 300);
             
             const blockData = {
                 el: block,
@@ -633,8 +865,8 @@
                 
                 // Rotate while falling
                 const currentRotation = parseInt(b.el.dataset.rotation || '0');
-                b.el.dataset.rotation = currentRotation + 3;
-                b.el.style.transform = `rotate(${currentRotation + 3}deg)`;
+                b.el.dataset.rotation = currentRotation + 4;
+                b.el.style.transform = `rotate(${currentRotation + 4}deg)`;
                 
                 // Remove if off screen
                 if (b.y > windowHeight) {
@@ -664,7 +896,7 @@
             
             // Start spawning
             spawnBlock();
-            spawnTimer = setInterval(spawnBlock, 700);
+            spawnTimer = setInterval(spawnBlock, 650);
             gameLoop();
         }
         
@@ -694,57 +926,14 @@
             $('back-btn').style.display = 'none';
         }
         
-        // ============ INIT CAMERA ============
-        async function initCamera() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { 
-                        facingMode: 'environment',
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 }
-                    }
-                });
-                
-                const video = $('camera-bg');
-                video.srcObject = stream;
-                await video.play();
-                
-                $('loading').classList.add('hidden');
-                $('start-screen').classList.remove('hidden');
-                state.cameraReady = true;
-                
-            } catch(err) {
-                console.error('Camera error:', err);
-                $('loading').innerHTML = `
-                    <p style="color:#ff4444;font-size:14px;text-align:center;padding:20px;max-width:300px;">
-                        📷 Ошибка камеры:<br><br>
-                        ${err.message}<br><br>
-                        1. Разреши доступ к камере<br>
-                        2. Используй HTTPS<br>
-                        3. Обнови страницу
-                    </p>
-                `;
-            }
-        }
-        
         // ============ EVENT LISTENERS ============
-        $('start-btn').addEventListener('click', () => {
-            if (!state.cameraReady) {
-                alert('Камера ещё загружается...');
-                return;
-            }
-            start();
-        });
-        
+        $('start-btn').addEventListener('click', start);
         $('play-again').addEventListener('click', reset);
         
         // Prevent default touch behaviors
         document.addEventListener('touchmove', (e) => {
             if (state.playing) e.preventDefault();
         }, { passive: false });
-        
-        // Start
-        initCamera();
     </script>
 </body>
 </html>
