@@ -5,7 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Minecraft AR</title>
     
-    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <!-- A-Frame -->
+    <script src="https://aframe.io/releases/1.4.2/aframe.min.js"></script>
+    <!-- AR.js -->
     <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
     
     <style>
@@ -48,7 +50,7 @@
         #start-screen {
             position: fixed;
             inset: 0;
-            background: rgba(0,0,0,0.9);
+            background: rgba(0,0,0,0.95);
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -74,10 +76,14 @@
             text-align: center;
         }
         
-        #marker-preview p {
-            color: #333;
-            font-size: 12px;
-            margin-bottom: 10px;
+        #error-msg {
+            background: #dc2626;
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 10px;
+            display: none;
+            text-align: center;
         }
         
         #start-btn {
@@ -90,6 +96,11 @@
             color: white;
             cursor: pointer;
             margin-top: 15px;
+        }
+        
+        #start-btn:disabled {
+            background: #666;
+            cursor: not-allowed;
         }
         
         #back-btn {
@@ -120,9 +131,7 @@
             z-index: 100;
         }
         
-        #status.found {
-            color: #4ade80;
-        }
+        #status.found { color: #4ade80; }
         
         #win-modal {
             position: fixed;
@@ -145,11 +154,7 @@
             color: white;
         }
         
-        #win-content h2 {
-            color: #fbbf24;
-            font-size: 24px;
-            margin-bottom: 15px;
-        }
+        #win-content h2 { color: #fbbf24; font-size: 24px; margin-bottom: 15px; }
         
         #promo {
             color: #4ade80;
@@ -178,44 +183,63 @@
             pointer-events: none;
             z-index: 150;
         }
+        
+        /* Loading */
+        #loading {
+            position: fixed;
+            inset: 0;
+            background: #000;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            color: white;
+        }
+        
+        #loading.hidden { display: none; }
+        
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 4px solid #333;
+            border-top: 4px solid #4ade80;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
+    <!-- Loading screen -->
+    <div id="loading">
+        <div class="spinner"></div>
+        <p style="margin-top: 20px;">Загрузка AR...</p>
+    </div>
+    
     <a href="/ar" id="back-btn">← Назад</a>
     
     <div id="ui">
         <div id="score">0<div id="combo">COMBO x2!</div></div>
     </div>
     
-    <div id="status">📷 Наведите камеру на маркер</div>
+    <div id="error-msg"></div>
+    <div id="status">📷 Загрузка камеры...</div>
     
     <div id="start-screen">
         <h1>MINECRAFT AR</h1>
         
         <div id="marker-preview">
-            <p>МАРКЕР ДЛЯ ПЕЧАТИ:</p>
-            <!-- Правильный AR.js маркер - простой чёрно-белый паттерн -->
-            <svg width="200" height="200" viewBox="0 0 100 100" style="border: 2px solid #000;">
-                <rect width="100" height="100" fill="white"/>
-                <!-- Чёрная рамка -->
-                <rect x="5" y="5" width="90" height="90" fill="black"/>
-                <!-- Белый внутренний квадрат -->
-                <rect x="15" y="15" width="70" height="70" fill="white"/>
-                <!-- Простой паттерн внутри - буква M -->
-                <g fill="black">
-                    <rect x="20" y="20" width="10" height="50"/>
-                    <rect x="30" y="20" width="10" height="10"/>
-                    <rect x="40" y="30" width="10" height="10"/>
-                    <rect x="50" y="20" width="10" height="10"/>
-                    <rect x="60" y="20" width="10" height="50"/>
-                </g>
-            </svg>
+            <p>МАРКЕР HIRO:</p>
+            <img src="https://raw.githubusercontent.com/AR-js-org/AR.js/master/data/images/hiro.png" 
+                 width="200" style="border: 2px solid #000;"/>
             <p style="margin-top: 10px; font-size: 11px; color: #666;">
                 Распечатайте или покажите на экране
             </p>
         </div>
         
-        <button id="start-btn">🎮 ИГРАТЬ</button>
+        <button id="start-btn" disabled>🎮 Загрузка...</button>
         
         <p style="color: #888; font-size: 12px; margin-top: 20px; text-align: center; max-width: 300px;">
             1. Распечатайте маркер или покажите на другом экране<br>
@@ -235,25 +259,56 @@
         </div>
     </div>
     
+    <!-- AR Scene -->
     <a-scene
         embedded
         arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
         vr-mode-ui="enabled: false"
-        renderer="antialias: true"
+        renderer="logConcurrency: false; antialias: true; alpha: true"
+        loading="enabled: false"
     >
-        <!-- Using Hiro preset - built-in marker -->
         <a-marker preset="hiro" id="ar-marker">
-            <!-- Game content appears here -->
             <a-entity id="game-container">
                 <a-plane position="0 -0.3 0" rotation="-90 0 0" width="0.8" height="0.8" 
-                         color="#5D8C3E" opacity="0.5"></a-plane>
+                         color="#5D8C3E" opacity="0.6"></a-plane>
             </a-entity>
         </a-marker>
-        
         <a-entity camera></a-entity>
     </a-scene>
     
     <script>
+        // Wait for libraries
+        let libsLoaded = false;
+        
+        function showError(msg) {
+            const el = document.getElementById('error-msg');
+            el.textContent = msg;
+            el.style.display = 'block';
+        }
+        
+        function checkLibraries() {
+            if (typeof AFRAME === 'undefined') {
+                showError('Ошибка: A-Frame не загрузился. Проверьте интернет.');
+                return false;
+            }
+            if (typeof ARJS === 'undefined' && !document.querySelector('a-marker')) {
+                showError('Ошибка: AR.js не загрузился. Проверьте интернет.');
+                return false;
+            }
+            return true;
+        }
+        
+        // Try to init after a delay
+        setTimeout(() => {
+            if (checkLibraries()) {
+                document.getElementById('loading').classList.add('hidden');
+                document.getElementById('start-btn').disabled = false;
+                document.getElementById('start-btn').textContent = '🎮 ИГРАТЬ';
+                document.getElementById('status').textContent = '📷 Наведите камеру на маркер HIRO';
+                libsLoaded = true;
+            }
+        }, 3000);
+        
         const state = {
             score: 0,
             playing: false,
@@ -275,28 +330,37 @@
         const $ = id => document.getElementById(id);
         
         // Audio
-        const audio = new (window.AudioContext || window.webkitAudioContext)();
+        let audioCtx = null;
+        function initAudio() {
+            if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+        }
+        
         function playSound(type) {
-            const osc = audio.createOscillator();
-            const gain = audio.createGain();
+            if (!audioCtx) return;
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
             osc.connect(gain);
-            gain.connect(audio.destination);
+            gain.connect(audioCtx.destination);
+            
             if (type === 'pop') {
-                osc.frequency.setValueAtTime(800, audio.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(200, audio.currentTime + 0.1);
-                gain.gain.setValueAtTime(0.2, audio.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.01, audio.currentTime + 0.1);
-                osc.start(); osc.stop(audio.currentTime + 0.1);
+                osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(200, audioCtx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+                osc.start();
+                osc.stop(audioCtx.currentTime + 0.1);
             } else {
                 [523, 659, 784, 1047].forEach((f, i) => {
-                    const o = audio.createOscillator();
-                    const g = audio.createGain();
-                    o.connect(g); g.connect(audio.destination);
+                    const o = audioCtx.createOscillator();
+                    const g = audioCtx.createGain();
+                    o.connect(g);
+                    g.connect(audioCtx.destination);
                     o.frequency.value = f;
-                    g.gain.setValueAtTime(0.15, audio.currentTime + i * 0.1);
-                    g.gain.exponentialRampToValueAtTime(0.01, audio.currentTime + i * 0.1 + 0.2);
-                    o.start(audio.currentTime + i * 0.1);
-                    o.stop(audio.currentTime + i * 0.1 + 0.2);
+                    g.gain.setValueAtTime(0.15, audioCtx.currentTime + i * 0.1);
+                    g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + i * 0.1 + 0.2);
+                    o.start(audioCtx.currentTime + i * 0.1);
+                    o.stop(audioCtx.currentTime + i * 0.1 + 0.2);
                 });
             }
         }
@@ -312,43 +376,19 @@
                     background: color, borderRadius: '2px'
                 });
                 document.body.appendChild(p);
-                const angle = Math.PI * 2 / 10 * i;
+                const angle = (Math.PI * 2 / 10) * i;
                 let vx = Math.cos(angle) * 80, vy = Math.sin(angle) * 80 - 50;
                 let px = x, py = y, op = 1;
                 const animate = () => {
-                    vy += 5; px += vx * 0.02; py += vy * 0.02; op -= 0.03;
+                    vy += 5;
+                    px += vx * 0.02;
+                    py += vy * 0.02;
+                    op -= 0.03;
                     p.style.cssText = `left:${px}px;top:${py}px;width:8px;height:8px;background:${color};border-radius:2px;opacity:${op}`;
                     op > 0 ? requestAnimationFrame(animate) : p.remove();
                 };
                 requestAnimationFrame(animate);
             }
-        }
-        
-        // Create pattern file dynamically
-        function createMarkerPattern() {
-            // Simple pattern for a distinctive marker
-            // This creates a pattern that can be recognized
-            const pattern = `
-# AR.js Pattern Marker
-# 16x16 pattern
-0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0
-0 1 0 0 0 0 0 0 0 0 0 0 0 0 1 0
-0 1 0 1 1 1 1 0 0 1 1 1 1 0 1 0
-0 1 0 1 0 0 0 0 0 0 0 0 1 0 1 0
-0 1 0 1 0 1 1 1 1 1 1 0 1 0 1 0
-0 1 0 1 0 1 0 0 0 0 1 0 1 0 1 0
-0 1 0 1 0 1 0 0 0 0 1 0 1 0 1 0
-0 1 0 1 0 1 0 0 0 0 1 0 1 0 1 0
-0 1 0 1 0 1 1 1 1 1 1 0 1 0 1 0
-0 1 0 1 0 0 0 0 0 0 0 0 1 0 1 0
-0 1 0 1 1 1 1 0 0 1 1 1 1 0 1 0
-0 1 0 0 0 0 0 0 0 0 0 0 0 0 1 0
-0 1 0 0 0 0 0 0 0 0 0 0 0 0 1 0
-0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0
-0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
-`;
-            return pattern;
         }
         
         let blockCount = 0;
@@ -377,7 +417,12 @@
             const data = { el: box, y: 0.8, x, z, vel: 0.008, type, caught: false };
             state.blocks.push(data);
             
+            // Click/touch handler
             box.addEventListener('click', () => tapBlock(data));
+            box.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                tapBlock(data);
+            });
         }
         
         function tapBlock(data) {
@@ -385,8 +430,8 @@
             data.caught = true;
             
             const canvas = document.querySelector('canvas');
-            const sx = canvas.width / 2 + data.x * 400;
-            const sy = canvas.height / 2 - data.y * 250;
+            const sx = canvas ? (canvas.width / 2 + data.x * 400) : 200;
+            const sy = canvas ? (canvas.height / 2 - data.y * 250) : 200;
             
             createParticles(sx, sy, data.type.color);
             playSound('pop');
@@ -418,7 +463,10 @@
                 if (b.caught) return false;
                 b.y -= b.vel;
                 b.el.setAttribute('position', `${b.x} ${b.y} ${b.z}`);
-                if (b.y < -0.3) { b.el.remove(); return false; }
+                if (b.y < -0.3) {
+                    b.el.remove();
+                    return false;
+                }
                 return true;
             });
             
@@ -426,6 +474,13 @@
         }
         
         function start() {
+            if (!libsLoaded) {
+                alert('Дождитесь загрузки AR!');
+                return;
+            }
+            
+            initAudio();
+            
             state.score = 0;
             state.playing = true;
             state.won = false;
@@ -437,8 +492,6 @@
             $('start-screen').classList.add('hidden');
             
             document.querySelectorAll('.game-block').forEach(b => b.remove());
-            
-            if (audio.state === 'suspended') audio.resume();
             
             spawnBlock();
             spawnTimer = setInterval(spawnBlock, 900);
@@ -468,22 +521,51 @@
         $('start-btn').onclick = start;
         $('play-again').onclick = reset;
         
-        document.addEventListener('touchstart', () => audio.resume(), { once: true });
+        document.addEventListener('touchstart', initAudio, { once: true });
+        document.addEventListener('click', initAudio, { once: true });
         
-        // Marker events
-        const marker = $('ar-marker');
-        marker.addEventListener('markerFound', () => {
-            console.log('Marker found!');
-            state.markerFound = true;
-            $('status').textContent = '✓ Маркер найден!';
-            $('status').classList.add('found');
+        // Marker events - wait for scene to load
+        const scene = document.querySelector('a-scene');
+        scene.addEventListener('loaded', () => {
+            console.log('Scene loaded');
+            
+            const marker = $('ar-marker');
+            
+            marker.addEventListener('markerFound', () => {
+                console.log('Marker found!');
+                state.markerFound = true;
+                $('status').textContent = '✓ Маркер найден!';
+                $('status').classList.add('found');
+            });
+            
+            marker.addEventListener('markerLost', () => {
+                state.markerFound = false;
+                $('status').textContent = '📷 Наведите камеру на маркер';
+                $('status').classList.remove('found');
+            });
         });
         
-        marker.addEventListener('markerLost', () => {
-            state.markerFound = false;
-            $('status').textContent = '📷 Наведите камеру на маркер';
-            $('status').classList.remove('found');
-        });
+        // Fallback: try to init marker events anyway
+        setTimeout(() => {
+            const marker = $('ar-marker');
+            if (marker) {
+                try {
+                    marker.addEventListener('markerFound', () => {
+                        state.markerFound = true;
+                        $('status').textContent = '✓ Маркер найден!';
+                        $('status').classList.add('found');
+                    });
+                    
+                    marker.addEventListener('markerLost', () => {
+                        state.markerFound = false;
+                        $('status').textContent = '📷 Наведите камеру на маркер';
+                        $('status').classList.remove('found');
+                    });
+                } catch(e) {
+                    console.log('Marker events error:', e);
+                }
+            }
+        }, 4000);
     </script>
 </body>
 </html>
