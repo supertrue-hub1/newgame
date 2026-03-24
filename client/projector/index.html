@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minecraft AR - Projector</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { 
+      width: 100%; height: 100%; overflow: hidden; 
+      background: #000; font-family: 'Press Start 2P', monospace; 
+    }
+    
+    #game-canvas { width: 100%; height: 100%; display: block; }
+    
+    #ui {
+      position: fixed; top: 0; left: 0; right: 0;
+      padding: 20px 40px;
+      display: flex; justify-content: space-between;
+      pointer-events: none; z-index: 100;
+    }
+    
+    #score-box {
+      background: rgba(0,0,0,0.85);
+      border: 4px solid #7D7D7D; border-radius: 8px;
+      padding: 15px 25px; display: flex; align-items: center; gap: 15px;
+    }
+    
+    #score-box .label { color: #888; font-size: 14px; }
+    #score { color: #FFD700; font-size: 28px; text-shadow: 2px 2px 0 #000; }
+    
+    #health-box {
+      background: rgba(0,0,0,0.85);
+      border: 4px solid #ff4444; border-radius: 8px;
+      padding: 15px 25px;
+    }
+    #health-label { color: #ff4444; font-size: 12px; display: block; margin-bottom: 5px; }
+    #health { color: #ff4444; font-size: 20px; }
+    
+    #status {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      background: rgba(0,0,0,0.85); border: 4px solid #50C878;
+      border-radius: 8px; padding: 12px 20px; z-index: 100;
+    }
+    #status-text { color: #50C878; font-size: 12px; }
+    
+    #start-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,0.9);
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center; z-index: 200;
+    }
+    #start-overlay.hidden { display: none; }
+    #start-overlay h1 { color: #50C878; font-size: 36px; text-shadow: 4px 4px 0 #3DA066; margin-bottom: 20px; }
+    #start-overlay p { color: #888; font-size: 14px; margin-bottom: 40px; }
+    #start-btn {
+      background: linear-gradient(180deg, #50C878 0%, #3DA066 100%);
+      border: 4px solid #2D7A4E; border-radius: 8px;
+      padding: 20px 50px; font-family: inherit; font-size: 16px;
+      color: #fff; cursor: pointer; text-shadow: 2px 2px 0 #000;
+      box-shadow: 0 6px 0 #1D4D32; transition: all 0.1s;
+    }
+    #start-btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #1D4D32; }
+    
+    .score-popup {
+      position: fixed; color: #FFD700; font-family: inherit;
+      font-size: 20px; text-shadow: 2px 2px 0 #000;
+      pointer-events: none; animation: scoreFloat 1s ease-out forwards; z-index: 150;
+    }
+    @keyframes scoreFloat {
+      0% { opacity: 1; transform: translateY(0) scale(1); }
+      100% { opacity: 0; transform: translateY(-50px) scale(1.5); }
+    }
+  </style>
+</head>
+<body>
+  <canvas id="game-canvas"></canvas>
+  
+  <div id="ui">
+    <div id="score-box">
+      <span class="label">SCORE:</span>
+      <span id="score">0</span>
+    </div>
+    <div id="health-box">
+      <span id="health-label">ЗАЩИТА</span>
+      <span id="health">100%</span>
+    </div>
+  </div>
+  
+  <div id="status"><span id="status-text">Подключение к серверу...</span></div>
+  
+  <div id="start-overlay">
+    <h1>⛏️ MINECRAFT AR</h1>
+    <p>Подключите телефон к серверу</p>
+    <button id="start-btn">🚀 НАЧАТЬ ИГРУ</button>
+  </div>
+  
+  <script>
+    const SERVER_URL = 'http://localhost:3001';
+    const BLOCK_COLORS = {
+      dirt: 0x8B5A2B, grass: 0x5D8C3E, stone: 0x9E9E9E,
+      coal: 0x333333, gold: 0xFFD700, diamond: 0x4AEDD9
+    };
+    
+    let scene, camera, renderer, socket;
+    let blocks = new Map();
+    let particles = [];
+    
+    function init() {
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x1a1a2e);
+      
+      camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+      camera.position.set(0, 4, 8);
+      camera.lookAt(0, 1.5, 0);
+      
+      renderer = new THREE.WebGLRenderer({ canvas: document.getElementById('game-canvas'), antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+      scene.add(ambientLight);
+      
+      const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+      dirLight.position.set(5, 10, 5);
+      scene.add(dirLight);
+      
+      createGround();
+      initSocket();
+      initEvents();
+      animate();
+      
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+    }
+    
+    function createGround() {
+      const groundGeo = new THREE.PlaneGeometry(20, 20);
+      const groundMat = new THREE.MeshStandardMaterial({ color: 0x3D5C2E });
+      const ground = new THREE.Mesh(groundGeo, groundMat);
+      ground.rotation.x = -Math.PI / 2;
+      ground.position.y = -0.5;
+      scene.add(ground);
+      
+      const grid = new THREE.GridHelper(10, 20, 0x555555, 0x333333);
+      grid.position.y = -0.49;
+      scene.add(grid);
+      
+      const defenseLine = new THREE.Mesh(
+        new THREE.BoxGeometry(12, 0.3, 0.1),
+        new THREE.MeshBasicMaterial({ color: 0xff4444, transparent: true, opacity: 0.8 })
+      );
+      defenseLine.position.set(0, 0, 2);
+      scene.add(defenseLine);
+    }
+    
+    function initSocket() {
+      socket = io(SERVER_URL, { transports: ['websocket', 'polling'] });
+      
+      socket.on('connect', () => {
+        updateStatus('Подключено!', false);
+        socket.emit('identify', { type: 'projector' });
+      });
+      
+      socket.on('disconnect', () => updateStatus('Отключено!', true));
+      
+      socket.on('game_state', (state) => {
+        document.getElementById('score').textContent = state.score;
+        document.getElementById('health').textContent = state.lineHealth + '%';
+      });
+      
+      socket.on('block_spawned', (block) => addBlock(block));
+      socket.on('block_destroyed', (data) => removeBlock(data.blockId, data.position));
+      socket.on('update_score', (data) => {
+        document.getElementById('score').textContent = data.score;
+        showScorePopup(data.points);
+      });
+      socket.on('line_damaged', (data) => {
+        document.getElementById('health').textContent = data.health + '%';
+      });
+      socket.on('game_started', () => {
+        document.getElementById('start-overlay').classList.add('hidden');
+        updateStatus('Игра началась!', false);
+      });
+      socket.on('game_over', (data) => {
+        updateStatus('ИГРА ОКОНЧЕНА! Счёт: ' + data.score, true);
+      });
+    }
+    
+    function initEvents() {
+      document.getElementById('start-btn').addEventListener('click', () => {
+        socket.emit('start_game');
+      });
+    }
+    
+    function addBlock(block) {
+      if (blocks.has(block.id)) return;
+      
+      const geo = new THREE.BoxGeometry(0.8, 0.8, 0.8);
+      const mat = new THREE.MeshStandardMaterial({ 
+        color: BLOCK_COLORS[block.type] || 0x888888,
+        roughness: 0.8,
+        metalness: block.type === 'gold' || block.type === 'diamond' ? 0.5 : 0.1
+      });
+      
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(block.position.x, block.position.y, block.position.z);
+      mesh.castShadow = true;
+      
+      const edges = new THREE.EdgesGeometry(geo);
+      const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x000000 }));
+      mesh.add(line);
+      
+      scene.add(mesh);
+      blocks.set(block.id, { mesh, data: block });
+    }
+    
+    function removeBlock(blockId, position) {
+      const block = blocks.get(blockId);
+      if (block) {
+        createExplosion(new THREE.Vector3(position.x, position.y, position.z));
+        scene.remove(block.mesh);
+        block.mesh.geometry.dispose();
+        block.mesh.material.dispose();
+        blocks.delete(blockId);
+      }
+    }
+    
+    function createExplosion(pos) {
+      const count = 15;
+      const geo = new THREE.BufferGeometry();
+      const positions = new Float32Array(count * 3);
+      
+      for (let i = 0; i < count; i++) {
+        positions[i*3] = pos.x + (Math.random() - 0.5);
+        positions[i*3+1] = pos.y + (Math.random() - 0.5);
+        positions[i*3+2] = pos.z + (Math.random() - 0.5);
+      }
+      
+      geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+      
+      const pts = new THREE.Points(geo, new THREE.PointsMaterial({ 
+        size: 0.15, color: 0xFFD700, transparent: true, opacity: 1 
+      }));
+      scene.add(pts);
+      particles.push({ points: pts, frame: 0 });
+    }
+    
+    function showScorePopup(points) {
+      const popup = document.createElement('div');
+      popup.className = 'score-popup';
+      popup.textContent = '+' + points;
+      popup.style.left = (window.innerWidth / 2) + 'px';
+      popup.style.top = '80px';
+      document.body.appendChild(popup);
+      setTimeout(() => popup.remove(), 1000);
+    }
+    
+    function updateStatus(text, isError) {
+      document.getElementById('status-text').textContent = text;
+      document.getElementById('status-text').style.color = isError ? '#ff4444' : '#50C878';
+    }
+    
+    function animate() {
+      requestAnimationFrame(animate);
+      
+      blocks.forEach((block) => {
+        block.data.position.y -= block.data.velocity * 0.016;
+        block.mesh.position.y = block.data.position.y;
+        block.mesh.rotation.y += 0.02;
+      });
+      
+      particles = particles.filter(p => {
+        p.frame++;
+        const pos = p.points.geometry.attributes.position.array;
+        for (let i = 1; i < pos.length; i += 3) pos[i] += 0.02;
+        p.points.geometry.attributes.position.needsUpdate = true;
+        p.points.material.opacity = 1 - p.frame / 60;
+        
+        if (p.frame < 60) return true;
+        scene.remove(p.points);
+        p.points.geometry.dispose();
+        return false;
+      });
+      
+      renderer.render(scene, camera);
+    }
+    
+    init();
+  </script>
+</body>
+</html>

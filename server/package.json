@@ -1,0 +1,17 @@
+{
+  "name": "minecraft-ar-server",
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run --watch src/index.ts",
+    "start": "bun run src/index.ts"
+  },
+  "dependencies": {
+    "socket.io": "^4.7.2",
+    "express": "^4.18.2",
+    "cors": "^2.8.5"
+  },
+  "devDependencies": {
+    "bun-types": "^1.0.0"
+  }
+}
