@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Minecraft AR</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap');
+    
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { 
+      width: 100%; height: 100%; 
+      background: linear-gradient(180deg, #1a1a2e 0%, #0f0f1a 100%);
+      font-family: 'Press Start 2P', monospace;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      color: #fff;
+    }
+    
+    h1 { color: #50C878; font-size: 28px; text-shadow: 4px 4px 0 #3DA066; margin-bottom: 40px; }
+    
+    .btn {
+      display: block;
+      width: 280px;
+      padding: 25px;
+      margin: 15px;
+      background: linear-gradient(180deg, #50C878 0%, #3DA066 100%);
+      border: 4px solid #2D7A4E; border-radius: 12px;
+      color: #fff; font-family: inherit; font-size: 14px;
+      text-decoration: none; text-align: center;
+      text-shadow: 2px 2px 0 #000;
+      box-shadow: 0 6px 0 #1D4D32;
+    }
+    
+    .btn:hover { transform: translateY(-2px); }
+    .btn:active { transform: translateY(4px); box-shadow: 0 2px 0 #1D4D32; }
+    
+    .btn-projector { background: linear-gradient(180deg, #6366F1 0%, #4F46E5 100%); border-color: #3730A3; }
+    .btn-phone { background: linear-gradient(180deg, #50C878 0%, #3DA066 100%); border-color: #2D7A4E; }
+    
+    p { color: #888; font-size: 10px; margin-top: 30px; text-align: center; line-height: 1.8; }
+  </style>
+</head>
+<body>
+  <h1>⛏️ MINECRAFT AR</h1>
+  
+  <a href="projector/" class="btn btn-projector">📺 ПРОЕКТОР</a>
+  <a href="phone/" class="btn btn-phone">📱 ТЕЛЕФОН</a>
+  
+  <p>Выбери устройство<br>Сервер: newgame.railway.internal</p>
+</body>
+</html>
