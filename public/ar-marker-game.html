@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Minecraft AR</title>
+    
+    <script src="https://aframe.io/releases/1.4.0/aframe.min.js"></script>
+    <script src="https://raw.githack.com/AR-js-org/AR.js/master/aframe/build/aframe-ar.js"></script>
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { overflow: hidden; background: #000; font-family: Arial, sans-serif; }
+        
+        #ui {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 15px;
+            z-index: 100;
+            pointer-events: none;
+        }
+        
+        #score {
+            position: absolute;
+            top: 15px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.85);
+            border: 3px solid #4ade80;
+            border-radius: 15px;
+            padding: 12px 25px;
+            color: #4ade80;
+            font-size: 32px;
+            font-weight: bold;
+            display: none;
+            text-align: center;
+        }
+        
+        #combo {
+            font-size: 16px;
+            color: #fbbf24;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        #start-screen {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.9);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 200;
+            padding: 20px;
+        }
+        
+        #start-screen.hidden { display: none; }
+        
+        #start-screen h1 {
+            color: #4ade80;
+            font-size: 28px;
+            margin-bottom: 20px;
+            text-shadow: 2px 2px 0 #000;
+        }
+        
+        #marker-preview {
+            background: #fff;
+            border: 4px solid #000;
+            padding: 15px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        
+        #marker-preview p {
+            color: #333;
+            font-size: 12px;
+            margin-bottom: 10px;
+        }
+        
+        #start-btn {
+            background: linear-gradient(135deg, #4ade80, #22c55e);
+            border: none;
+            border-radius: 15px;
+            padding: 20px 40px;
+            font-size: 20px;
+            font-weight: bold;
+            color: white;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+        
+        #back-btn {
+            position: fixed;
+            top: 15px;
+            left: 15px;
+            background: rgba(0,0,0,0.8);
+            border: 2px solid #fff;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            z-index: 300;
+            text-decoration: none;
+            font-size: 14px;
+        }
+        
+        #status {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: #fbbf24;
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 14px;
+            z-index: 100;
+        }
+        
+        #status.found {
+            color: #4ade80;
+        }
+        
+        #win-modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.95);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 500;
+        }
+        
+        #win-modal.show { display: flex; }
+        
+        #win-content {
+            background: linear-gradient(135deg, #1a1a2e, #2d2d5a);
+            border: 4px solid #fbbf24;
+            border-radius: 25px;
+            padding: 30px 40px;
+            text-align: center;
+            color: white;
+        }
+        
+        #win-content h2 {
+            color: #fbbf24;
+            font-size: 24px;
+            margin-bottom: 15px;
+        }
+        
+        #promo {
+            color: #4ade80;
+            font-size: 20px;
+            background: rgba(74, 222, 128, 0.1);
+            padding: 12px 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+            font-family: monospace;
+        }
+        
+        #play-again {
+            background: linear-gradient(135deg, #fbbf24, #f59e0b);
+            border: none;
+            border-radius: 12px;
+            padding: 12px 30px;
+            font-size: 16px;
+            font-weight: bold;
+            color: #1a1a2e;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        
+        .particle {
+            position: fixed;
+            pointer-events: none;
+            z-index: 150;
+        }
+    </style>
+</head>
+<body>
+    <a href="/ar" id="back-btn">← Назад</a>
+    
+    <div id="ui">
+        <div id="score">0<div id="combo">COMBO x2!</div></div>
+    </div>
+    
+    <div id="status">📷 Наведите камеру на маркер</div>
+    
+    <div id="start-screen">
+        <h1>MINECRAFT AR</h1>
+        
+        <div id="marker-preview">
+            <p>МАРКЕР ДЛЯ ПЕЧАТИ:</p>
+            <!-- Правильный AR.js маркер - простой чёрно-белый паттерн -->
+            <svg width="200" height="200" viewBox="0 0 100 100" style="border: 2px solid #000;">
+                <rect width="100" height="100" fill="white"/>
+                <!-- Чёрная рамка -->
+                <rect x="5" y="5" width="90" height="90" fill="black"/>
+                <!-- Белый внутренний квадрат -->
+                <rect x="15" y="15" width="70" height="70" fill="white"/>
+                <!-- Простой паттерн внутри - буква M -->
+                <g fill="black">
+                    <rect x="20" y="20" width="10" height="50"/>
+                    <rect x="30" y="20" width="10" height="10"/>
+                    <rect x="40" y="30" width="10" height="10"/>
+                    <rect x="50" y="20" width="10" height="10"/>
+                    <rect x="60" y="20" width="10" height="50"/>
+                </g>
+            </svg>
+            <p style="margin-top: 10px; font-size: 11px; color: #666;">
+                Распечатайте или покажите на экране
+            </p>
+        </div>
+        
+        <button id="start-btn">🎮 ИГРАТЬ</button>
+        
+        <p style="color: #888; font-size: 12px; margin-top: 20px; text-align: center; max-width: 300px;">
+            1. Распечатайте маркер или покажите на другом экране<br>
+            2. Нажмите ИГРАТЬ<br>
+            3. Наведите камеру на маркер
+        </p>
+    </div>
+    
+    <div id="win-modal">
+        <div id="win-content">
+            <h2>🎉 Победа!</h2>
+            <p>Очки: <span id="final-score">0</span></p>
+            <p style="font-size: 12px; color: #888;">Ваш промокод:</p>
+            <div id="promo">MINECRAFT-AR</div>
+            <p style="font-size: 11px; color: #888;">Скидка 20%</p>
+            <button id="play-again">Играть снова</button>
+        </div>
+    </div>
+    
+    <a-scene
+        embedded
+        arjs="sourceType: webcam; debugUIEnabled: false; detectionMode: mono_and_matrix; matrixCodeType: 3x3;"
+        vr-mode-ui="enabled: false"
+        renderer="antialias: true"
+    >
+        <!-- Using Hiro preset - built-in marker -->
+        <a-marker preset="hiro" id="ar-marker">
+            <!-- Game content appears here -->
+            <a-entity id="game-container">
+                <a-plane position="0 -0.3 0" rotation="-90 0 0" width="0.8" height="0.8" 
+                         color="#5D8C3E" opacity="0.5"></a-plane>
+            </a-entity>
+        </a-marker>
+        
+        <a-entity camera></a-entity>
+    </a-scene>
+    
+    <script>
+        const state = {
+            score: 0,
+            playing: false,
+            won: false,
+            blocks: [],
+            combo: 0,
+            lastTap: 0,
+            markerFound: false
+        };
+        
+        const BLOCK_TYPES = [
+            { name: 'dirt', color: '#8B5A2B', points: 1 },
+            { name: 'grass', color: '#5D8C3E', points: 1 },
+            { name: 'stone', color: '#7D7D7D', points: 1 },
+            { name: 'gold', color: '#FFD700', points: 3 },
+            { name: 'diamond', color: '#4AEDD9', points: 5 }
+        ];
+        
+        const $ = id => document.getElementById(id);
+        
+        // Audio
+        const audio = new (window.AudioContext || window.webkitAudioContext)();
+        function playSound(type) {
+            const osc = audio.createOscillator();
+            const gain = audio.createGain();
+            osc.connect(gain);
+            gain.connect(audio.destination);
+            if (type === 'pop') {
+                osc.frequency.setValueAtTime(800, audio.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(200, audio.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.2, audio.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, audio.currentTime + 0.1);
+                osc.start(); osc.stop(audio.currentTime + 0.1);
+            } else {
+                [523, 659, 784, 1047].forEach((f, i) => {
+                    const o = audio.createOscillator();
+                    const g = audio.createGain();
+                    o.connect(g); g.connect(audio.destination);
+                    o.frequency.value = f;
+                    g.gain.setValueAtTime(0.15, audio.currentTime + i * 0.1);
+                    g.gain.exponentialRampToValueAtTime(0.01, audio.currentTime + i * 0.1 + 0.2);
+                    o.start(audio.currentTime + i * 0.1);
+                    o.stop(audio.currentTime + i * 0.1 + 0.2);
+                });
+            }
+        }
+        
+        // Particles
+        function createParticles(x, y, color) {
+            for (let i = 0; i < 10; i++) {
+                const p = document.createElement('div');
+                p.className = 'particle';
+                Object.assign(p.style, {
+                    left: x + 'px', top: y + 'px',
+                    width: '8px', height: '8px',
+                    background: color, borderRadius: '2px'
+                });
+                document.body.appendChild(p);
+                const angle = Math.PI * 2 / 10 * i;
+                let vx = Math.cos(angle) * 80, vy = Math.sin(angle) * 80 - 50;
+                let px = x, py = y, op = 1;
+                const animate = () => {
+                    vy += 5; px += vx * 0.02; py += vy * 0.02; op -= 0.03;
+                    p.style.cssText = `left:${px}px;top:${py}px;width:8px;height:8px;background:${color};border-radius:2px;opacity:${op}`;
+                    op > 0 ? requestAnimationFrame(animate) : p.remove();
+                };
+                requestAnimationFrame(animate);
+            }
+        }
+        
+        // Create pattern file dynamically
+        function createMarkerPattern() {
+            // Simple pattern for a distinctive marker
+            // This creates a pattern that can be recognized
+            const pattern = `
+# AR.js Pattern Marker
+# 16x16 pattern
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0
+0 1 0 0 0 0 0 0 0 0 0 0 0 0 1 0
+0 1 0 1 1 1 1 0 0 1 1 1 1 0 1 0
+0 1 0 1 0 0 0 0 0 0 0 0 1 0 1 0
+0 1 0 1 0 1 1 1 1 1 1 0 1 0 1 0
+0 1 0 1 0 1 0 0 0 0 1 0 1 0 1 0
+0 1 0 1 0 1 0 0 0 0 1 0 1 0 1 0
+0 1 0 1 0 1 0 0 0 0 1 0 1 0 1 0
+0 1 0 1 0 1 1 1 1 1 1 0 1 0 1 0
+0 1 0 1 0 0 0 0 0 0 0 0 1 0 1 0
+0 1 0 1 1 1 1 0 0 1 1 1 1 0 1 0
+0 1 0 0 0 0 0 0 0 0 0 0 0 0 1 0
+0 1 0 0 0 0 0 0 0 0 0 0 0 0 1 0
+0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 0
+0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+`;
+            return pattern;
+        }
+        
+        let blockCount = 0;
+        let spawnTimer = null;
+        
+        function spawnBlock() {
+            if (!state.playing || state.won || !state.markerFound) return;
+            
+            const marker = $('ar-marker');
+            const type = BLOCK_TYPES[Math.floor(Math.random() * BLOCK_TYPES.length)];
+            
+            const box = document.createElement('a-box');
+            box.setAttribute('width', '0.15');
+            box.setAttribute('height', '0.15');
+            box.setAttribute('depth', '0.15');
+            box.setAttribute('color', type.color);
+            box.setAttribute('id', 'block-' + blockCount++);
+            box.setAttribute('class', 'game-block');
+            
+            const x = (Math.random() - 0.5) * 0.5;
+            const z = (Math.random() - 0.5) * 0.5;
+            box.setAttribute('position', `${x} 0.8 ${z}`);
+            
+            marker.appendChild(box);
+            
+            const data = { el: box, y: 0.8, x, z, vel: 0.008, type, caught: false };
+            state.blocks.push(data);
+            
+            box.addEventListener('click', () => tapBlock(data));
+        }
+        
+        function tapBlock(data) {
+            if (data.caught || !state.playing) return;
+            data.caught = true;
+            
+            const canvas = document.querySelector('canvas');
+            const sx = canvas.width / 2 + data.x * 400;
+            const sy = canvas.height / 2 - data.y * 250;
+            
+            createParticles(sx, sy, data.type.color);
+            playSound('pop');
+            
+            const now = Date.now();
+            state.combo = now - state.lastTap < 1500 ? state.combo + 1 : 1;
+            state.lastTap = now;
+            
+            const pts = data.type.points * Math.min(state.combo, 5);
+            state.score += pts;
+            $('score').firstChild.textContent = state.score;
+            
+            if (state.combo >= 2) {
+                $('combo').textContent = 'COMBO x' + state.combo + '!';
+                $('combo').style.opacity = '1';
+                setTimeout(() => $('combo').style.opacity = '0', 500);
+            }
+            
+            data.el.setAttribute('animation', 'property: scale; to: 0 0 0; dur: 80');
+            setTimeout(() => data.el.remove(), 80);
+            
+            if (state.score >= 10) win();
+        }
+        
+        function gameLoop() {
+            if (!state.playing || state.won) return;
+            
+            state.blocks = state.blocks.filter(b => {
+                if (b.caught) return false;
+                b.y -= b.vel;
+                b.el.setAttribute('position', `${b.x} ${b.y} ${b.z}`);
+                if (b.y < -0.3) { b.el.remove(); return false; }
+                return true;
+            });
+            
+            requestAnimationFrame(gameLoop);
+        }
+        
+        function start() {
+            state.score = 0;
+            state.playing = true;
+            state.won = false;
+            state.blocks = [];
+            state.combo = 0;
+            
+            $('score').firstChild.textContent = '0';
+            $('score').style.display = 'block';
+            $('start-screen').classList.add('hidden');
+            
+            document.querySelectorAll('.game-block').forEach(b => b.remove());
+            
+            if (audio.state === 'suspended') audio.resume();
+            
+            spawnBlock();
+            spawnTimer = setInterval(spawnBlock, 900);
+            gameLoop();
+        }
+        
+        function win() {
+            state.won = true;
+            state.playing = false;
+            clearInterval(spawnTimer);
+            playSound('win');
+            state.blocks.forEach(b => b.el.remove());
+            state.blocks = [];
+            $('final-score').textContent = state.score;
+            $('win-modal').classList.add('show');
+        }
+        
+        function reset() {
+            state.won = false;
+            state.playing = false;
+            $('win-modal').classList.remove('show');
+            $('start-screen').classList.remove('hidden');
+            $('score').style.display = 'none';
+        }
+        
+        // Init
+        $('start-btn').onclick = start;
+        $('play-again').onclick = reset;
+        
+        document.addEventListener('touchstart', () => audio.resume(), { once: true });
+        
+        // Marker events
+        const marker = $('ar-marker');
+        marker.addEventListener('markerFound', () => {
+            console.log('Marker found!');
+            state.markerFound = true;
+            $('status').textContent = '✓ Маркер найден!';
+            $('status').classList.add('found');
+        });
+        
+        marker.addEventListener('markerLost', () => {
+            state.markerFound = false;
+            $('status').textContent = '📷 Наведите камеру на маркер';
+            $('status').classList.remove('found');
+        });
+    </script>
+</body>
+</html>
